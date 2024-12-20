@@ -1,0 +1,32 @@
+---
+title: "Let us to explore the flights datasets"
+author: "杨文灿——202214281005"
+---
+
+This is a website created by Wencan Yang.
+
+This is an English-Chinese mixed website. On this website, I present my analysis related to flight delays in the Flights dataset.
+
+Firstly, I conducted an initial exploratory data analysis on the flights dataset and the weather dataset in the nycflights13 package to understand the relationships among various variables.
+
+Then, I combined the two datasets and performed certain preprocessing on the combined data to make the dataset complete and clean.
+
+After that, I constructed a full model and a selected model using the general linear model method.
+
+Finally, taking arr_delay = 0 as the critical point, flights with a value greater than 0 are regarded as delayed, and those less than 0 are considered to arrive on time. Based on this rule, the continuous target variable is transformed into a binary variable.
+
+Subsequently, a machine learning model is constructed for prediction on the basis of 5-fold cross-validation. The accuracy reaches 0.8, but there is still room for improvement.
+
+::: callout-important
+## 思路简介
+
+-   首先我对于nycflights13包中的flights数据集和weather数据集做了初步的数据探索性分析了解各变量之间的关系。
+
+-   将两个数据集联立，对联立后的数据做一定的预处理，使得数据集完整，干净。
+
+-   使用一般线性模型的方法构建全模型和选模型，R2值达到0.83。
+
+-   之后由临界点arr_delay=0为临界点，大于0视为延迟，小于0为正常抵达。以这个规则将连续型的目标变量划转化成二分类的变量。
+
+-   在使用5折交叉验证的基础上构建机器学习模型进行预测。精确程度达到0.8，但仍有提升的空间。
+:::

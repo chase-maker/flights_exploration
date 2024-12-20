@@ -1,0 +1,47 @@
+project: 
+  type: website
+  
+website: 
+  page-navigation: true
+  title: "EDA and Machine learning" 
+  site-url: "https://github.com/chase-maker/Flights_exploration.git" 
+  repo-url: https://github.com/chase-maker/Flights_exploration.git 
+  repo-actions: [edit, issue]
+  
+  page-footer:
+    right: "This page is built with ❤️ and [github](https://quarto.org/)."
+    left: "&copy; created by Wencan Yang; December 2024"
+    
+  sidebar:
+    logo: "Daisy.png"
+    pinned: true
+    align: center
+    tools: 
+      - icon: github
+        href: https://github.com/chase-maker/Flights_exploration.git
+        text: "Quarto website tutorial"
+
+    style: "docked"
+    search: true
+    collapse-level: 1
+    contents:
+      - href: index.qmd
+        text: Welcome
+      - section: Exploratory Data Analysis
+        contents: 
+          - EDA/flights.qmd
+          - EDA/weather.qmd
+          - EDA/joined_data.qmd 
+      - href: linearregression.qmd
+        text: Linear Regression
+      - href: about.qmd
+        text: Machine Learning
+format:
+  html:
+    theme: cosmo
+    code-copy: true
+    code-overflow: wrap
+    toc: true
+
+
+

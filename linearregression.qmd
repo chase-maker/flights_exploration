@@ -1,0 +1,79 @@
+---
+title: "linear regression"
+editor: visual
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE,
+	collapse=TRUE,
+	prompt=TRUE,
+	comment='  '
+)
+```
+
+# 一般线性回归
+```{r}
+library(readxl)
+joined_data <- read_excel("D:\\Rstudio\\Rmyfile\\Flights\\EDA\\joined_data.xlsx")
+```
+
+```{r}
+D <- lm(arr_delay~month+day+hour+dep_time+sched_dep_time+arr_time+carrier+flight+origin+dest+air_time+distance+temp+dewp+humid+wind_dir+wind_speed+pressure+visib,data = joined_data) 
+summary(D)
+```
+
+将几乎所有的变量都放进去之后，发现拟合效果并不好，仅能解释20%的延迟到达的变异。
+
+同时，我们发现，在全模型下，上面提到的两个正相关的变量temp与dewp的P值，temp十分显著，dewp的P=0.96》0.05。因此我们分别对两个变量做一个单变量的线性回归做一下验证。
+
+```{r}
+lm(data = joined_data,arr_delay~temp) |>summary()
+lm(data = joined_data,arr_delay~dewp) |>summary()
+```
+
+忽略R2的值，我们发现,两个模型均显著，但我们上面全模型中，dewp并不显著。因此我们认为，在对arr_delay的贡献上，dewp可能会抢temp的功劳而认为其与航班推迟有关，而其实是因为dewp与temp有关所以才在单个模型中显著。当二者同时出现在模型中时，真正起作用的变量就体现出来了。证实了我们课上的结论。因此之后筛选模型时，将会优先考虑使用temp而不是dewp。
+
+# 观察变量之间的相关性
+
+将关心的变量中数值类型和字符类型分开处理
+
+```{r}
+numdata <- joined_data[,c(4:9,15:17,20:26)]
+strdata <- joined_data[,c(2,3,10,13,14)]
+```
+
+对于数值类型变量做相关性图
+
+```{r}
+library(corrplot)
+corrplot(corr = cor(numdata),type = 'upper')
+```
+
+发现，arr_delay与dep_delay之间有很强的相关性，因此在回归方程中引入dep_delay变量。解释为：离开延迟，大概率到达也会延迟。
+
+# 根据实际情况回归
+
+从乘客角度出发筛选变量。已知，出发月份2，日期3，预计离开时间5，离开延迟9，预计到达时间8，航空公司10，出发地13，目的地14（回归不显著），距离16，空气质量数据20：27（wind_gust由于缺失数据太多，不纳入拟合方程中）
+
+```{r}
+Care_data <- joined_data[,c(2,3,5,6,8,9,10,13,14,16,17,20:27)]
+```
+
+```{r}
+lm(arr_delay~.-day-dewp,data = Care_data) |>summary()
+```
+
+::: callout-important
+## Q4 减少变量之后拟合优度R2显著提升，原因是什么？
+
+现象：对于挑出的具有代表性的变量进行集合之后，发现调整后的R2值提高到0.83.一个很震惊的结果！！！！
+
+分析原因如下：
+
+R2值，也称为决定系数，是衡量线性回归模型拟合优度的重要指标。它表示模型解释的变异占总变异的比例，计算公式为R2=1-SSres/SStot，其中SSres是残差平方和，即实际观测值与模型预测值之差的平方和；SStot是总平方和，即实际观测值与观测值平均值之差的平方和。
+
+1.去除噪声：如果减少的变量是噪声变量（即与因变量关系不显著或无关的变量），那么去除这些变量可以减少模型中的噪声，提高模型的解释能力，进而使R2值变大。 2.自由度变化：在多元线性回归中，增加解释变量会减少模型的自由度。当减少变量时，自由度增加，这可能导致残差平方和（SSres）相对于总平方和（SStot）的比例减小，从而使R2值变大。但需要注意的是，这种变化并不总是显著的，因为R2值还受到其他因素的影响。
+:::

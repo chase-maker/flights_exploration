@@ -1,0 +1,206 @@
+---
+title: "机器学习模型构建"
+---
+
+在本章，尝试了多种机器学习方法，但由于数据量很大，但计算机资源有限，因此这里只展示了目前训练较好的模型和最好的参数选择。
+
+```{python}
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split, GridSearchCV, cross_val_score
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.metrics import cohen_kappa_score
+from sklearn.metrics import classification_report, accuracy_score
+from sklearn.metrics import confusion_matrix, accuracy_score, precision_score, recall_score, f1_score
+from sklearn.model_selection import StratifiedKFold
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+```
+
+# 载入数据
+```{python}
+Care_data = pd.read_excel("D:\\Rstudio\\Rmyfile\\dear Cancan.R\\select_data.xlsx")
+print(f"Number of rows: {Care_data.shape[0]}, Number of columns: {Care_data.shape[1]}")
+print(Care_data)
+print('数据载入完毕============================================1')
+```
+
+# 数据处理
+```{python}
+Care_data['result'] = Care_data['arr_delay'].apply(lambda x: 1 if x > 0 else 0)
+print('二分类变量添加完毕=========================================2')
+```
+
+```{python}
+plt.rcParams['font.sans-serif'] = ['SimHei']  # 设置默认字体为SimHei，支持中文显示
+plt.rcParams['axes.unicode_minus'] = False  # 解决保存图像时负号'-'显示为方块的问题
+sns.countplot(x='result', data=Care_data)
+plt.show()
+print('变量分布图创建完毕=====================================3')
+```
+
+数据分布不太均衡，正常：延迟 约=5:3
+
+```{python}
+categorical_features = ['month', 'day', 'hour','carrier', 'origin', 'dest']
+categorical_transformer = OneHotEncoder(handle_unknown='ignore')
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('cat', categorical_transformer, categorical_features)],
+    remainder='passthrough')  # 对于非分类特征，直接传递
+print('独热编码进行完毕=======================================4')
+```
+
+# 划分训练集和测试集
+以8:2的比例划分训练集和测试集
+```{python}
+X = Care_data.drop(columns=['result', 'arr_delay'])  # 假设'result'是目标变量的新名称，'arr_delay'用于生成'result'
+Y = Care_data['result']
+np.random.seed(1234)
+TrainX, TestX, TrainY, TestY = train_test_split(X, Y, test_size=0.2, random_state=42, stratify=Y)
+print('训练集和测试集划分完毕==================================5')
+TrainX
+```
+
+# 5折交叉验证
+5折交叉验证的原理是将训练数据划分成5份，训练5次，每次用其中一份作为测试集，其余4份作为训练集。通过多次训练取平均来避免模型的过度拟合，提升模型的泛化能力。
+```{python}
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+```
+
+# 在测试机表现评价函数
+```{python}
+def myconfusionmatrix(TestY, y_pred):
+    # 混淆矩阵
+    cm = confusion_matrix(TestY, y_pred)
+    # Kappa值
+    kappa = cohen_kappa_score(TestY, y_pred)
+    # 计算准确率
+    accuracy = accuracy_score(TestY, y_pred)
+    # 计算精确率（对于多分类问题，需要指定平均方法，如'macro', 'micro', 'weighted'）
+    precision = precision_score(TestY, y_pred, average='macro')  # 或者使用'micro', 'weighted'等
+    # 计算召回率
+    recall = recall_score(TestY, y_pred, average='macro')  # 同样需要指定平均方法
+    # 计算F1分数
+    f1 = f1_score(TestY, y_pred, average='weighted')  # 同样需要指定平均方法
+    return (cm, accuracy, precision, recall, f1, kappa)
+```
+
+# 随机森林模型构建
+```{python}
+pipeline = Pipeline(steps=[('preprocessor', preprocessor),
+                           ('classifier', RandomForestClassifier(random_state=42, n_estimators=100))])
+param_grid = {
+    'classifier__n_estimators': [300],
+    'classifier__max_features': ['sqrt'],
+    'classifier__max_depth': [10],
+    'classifier__criterion': ['gini']
+}
+                           
+```
+
+```{python}
+grid_search = GridSearchCV(pipeline, param_grid, cv=cv, scoring='accuracy', n_jobs=-1, verbose=1)
+grid_search.fit(TrainX, TrainY)
+print("Best parameters for RandomForest:", grid_search.best_params_)
+print("Best cross-validation score for RandomForest:", grid_search.best_score_)
+```
+
+该模型的综合评分为0.80。
+
+# 测试集上的表现
+```{python}
+best_rf = grid_search.best_estimator_
+y_pred = best_rf.predict(TestX)
+list2 = myconfusionmatrix(TestY, y_pred)
+confusion_matrix = list2[0]
+accuracy = list2[1]
+precision = list2[2]
+recall = list2[3]
+f1_score = list2[4]
+Kappa = list2[5]
+print('输出混淆矩阵========================================7')
+print(f"Confusion Matrix:\n{confusion_matrix}\nKappa:{Kappa}\nAccuracy: {accuracy}\nPrecision: {precision}\nRecall: {recall}\nF1 Score: {f1_score}")
+```
+
+混淆矩阵：正类是延迟，负类是正常
+
+真正例（True Positive，TP）：这里是 12105，表示实际航班延迟，并且模型也正确预测为延迟抵达的样本数量。
+假正例（False Positive，FP）：位于矩阵右上角的值，即 1516，代表实际属于正常抵达，但模型错误地预测为延迟的样本数量。
+假负例（False Negative，FN）：在矩阵左下角，值为 9906，意味着实际属于延迟，然而模型却预测为正常抵达的样本数量。
+真负例（True Negative，TN）：位于矩阵左上角，也就是 33383，是实际为正常且模型也正确预测为正常抵达的样本数量。
+
+即：实际正常抵达的航班中有1516个预测错误；实际延迟抵达的航班中有9906个预测错误，在正类的预测中准确率不太高。
+
+ Kappa 值
+ 0.5448613656932183，说明模型的分类结果相较于随机分类有一定程度的一致性，但还存在改进的空间。
+ 
+::: callout-caution
+## Kappa值的判定标准
+
+用于衡量分类任务中两个观察者（或模型预测与真实标签）之间一致性的统计指标。
+
+0.00\~0.20：极低的一致性（slight），表示评估结果或模型预测与实际标签之间的一致性很差，可能存在较大的差异。
+
+0.21\~0.40：较低的一致性（fair），表示有一定的一致性，但整体仍然偏低。
+
+0.41\~0.60：中等的一致性（moderate），表示评估结果或模型预测与实际标签之间的一致性较为适中。
+
+0.61\~0.80：较高的一致性（substantial），表示评估结果或模型预测与实际标签之间的一致性较高。
+
+0.81\~1.00：高一致性（almost perfect），表示评估结果或模型预测与实际标签之间的一致性几乎完全一致。
+:::
+
+准确率
+为 0.7992971358285011，意味着模型总体上能正确分类大约 80% 的样本，但这个指标可能会在样本不平衡的情况下有一定误导性，比如正负样本数量差异很大时，准确率高不一定代表模型对少数类的分类能力强。
+
+精确率
+为 0.8299335775977371，表明当模型预测某个样本为正类时，有大约 83% 的概率是预测正确的。
+
+召回率
+0.7532563282373411，意味着在所有实际的正类样本里，模型能够正确找出来的比例约为 75%，反映了模型对正类样本的覆盖能力。
+
+F1 分数
+为 0.7864363936594723，代表模型在精确率和召回率上整体达到了一定的平衡水平，不过同样还有一定的提升空间。
+
+
+
+# ROC曲线绘制
+```{python}
+from sklearn.metrics import roc_curve, auc
+```
+
+# 提取概率值
+```{python}
+rf_pred_prob = best_rf.predict_proba(TestX)[:, 1] 
+```
+
+
+# 计算AUC值
+
+```{python}
+fpr1, tpr1, thresholds1 = roc_curve(TestY, rf_pred_prob)  
+auc1 = auc(fpr1, tpr1) 
+```
+
+# 绘制ROC曲线
+
+```{python}
+plt.figure()  
+plt.plot(fpr1, tpr1, color='red', lw=2, label=f'Random Forest (AUC = {auc1:.2f})')  
+plt.plot([0, 1], [0, 1], color='black', lw=2, linestyle='--')  
+plt.xlim([0.0, 1.0])  
+plt.ylim([0.0, 1.05])  
+plt.xlabel('False Positive Rate')  
+plt.ylabel('True Positive Rate')  
+plt.title('Receiver Operating Characteristic (ROC) Curves')  
+plt.legend(loc="lower right")  
+plt.show()
+```
+
+该模型的AUC值为0.84，模型训练各指标可以接受，但还有待提升。
+
+
